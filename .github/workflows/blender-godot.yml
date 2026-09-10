@@ -26,7 +26,7 @@ jobs:
           cp godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.tres
           sed -i "s|__JAVA_HOME__|$JAVA_HOME|" ~/.config/godot/editor_settings-4.tres
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;35.0.1" "platforms;android-35" "cmake;3.10.2.4988404" "ndk;28.1.13356709"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;35.0.1" "platforms;android-35"
           keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           godot --headless --editor --path godot --script res://configure_android.gd
       - name: Import generated GLB
