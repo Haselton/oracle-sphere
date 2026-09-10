@@ -25,6 +25,7 @@ gold=principled('Etched Gold',(.60,.30,.055),.94,.16,(.9,.42,.08),.55)
 stone=principled('Matte Charcoal Stone',(.012,.016,.022),.04,.78)
 die_dark=principled('Obsidian Faces',(.006,.025,.034),.42,.17)
 teal_glow=emission('Nebula Teal',(.005,.72,.74),7.0);gold_glow=emission('Nebula Gold',(1.0,.34,.045),5.0)
+glass_rim=emission('Glass Rim',(.01,.34,.38),1.35)
 
 # Exact regular dodecahedron: 20 vertices, 30 edges, 12 pentagons.
 p=(1+5**.5)/2;q=1/p
@@ -68,6 +69,7 @@ bpy.ops.mesh.primitive_torus_add(major_radius=2.82,minor_radius=.045,major_segme
 
 # Deterministic portrait product checkpoint.
 preview_only=[]
+bpy.ops.curve.primitive_bezier_circle_add(radius=3.45,location=(0,-.08,1.05),rotation=(math.pi/2,0,0));preview_rim=bpy.context.object;preview_rim.data.bevel_depth=.025;preview_rim.data.bevel_resolution=3;preview_rim.data.materials.append(glass_rim);preview_only.append(preview_rim)
 bpy.ops.mesh.primitive_plane_add(size=40,location=(0,0,-2.84));floor=bpy.context.object;floor.data.materials.append(stone);preview_only.append(floor)
 bpy.ops.object.camera_add(location=(0,-20.5,1.45));cam=bpy.context.object;preview_only.append(cam);cam.rotation_euler=(Vector((0,0,.45))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.lens=53;bpy.context.scene.camera=cam
 for loc,color,energy,size in [((-4,-5,7),(1.,.68,.30),1150,4.),((4,-1,4),(.02,.72,.78),850,3.),((0,3,7),(.35,.55,1.),650,3.)]:
@@ -77,7 +79,9 @@ scene.world.use_nodes=True;bg=scene.world.node_tree.nodes.get('Background');bg.i
 scene.use_nodes=True;nodes=scene.node_tree.nodes;links=scene.node_tree.links
 for n in list(nodes):nodes.remove(n)
 rl=nodes.new('CompositorNodeRLayers');glare=nodes.new('CompositorNodeGlare');glare.glare_type='FOG_GLOW';glare.quality='HIGH';glare.threshold=.8;glare.size=7;comp=nodes.new('CompositorNodeComposite');links.new(rl.outputs['Image'],glare.inputs['Image']);links.new(glare.outputs['Image'],comp.inputs['Image'])
+globe.hide_render=True
 bpy.ops.render.render(write_still=True)
+globe.hide_render=False
 for obj in preview_only:bpy.data.objects.remove(obj,do_unlink=True)
 bpy.ops.export_scene.gltf(filepath=os.path.join(OUT,'oracle_models.glb'),export_format='GLB',use_selection=False,export_apply=True)
 print('Rendered',PREVIEW);print('Exported',os.path.join(OUT,'oracle_models.glb'))
