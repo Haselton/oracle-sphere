@@ -49,5 +49,7 @@ jobs:
           GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
       - uses: actions/upload-artifact@v4
         with:
-          name: oracle-sphere-v0.4-blender-godot
-          path: build/ORACLE-SPHERE-v0.4.apk
+          name: oracle-sphere-v0.5-visual-checkpoint
+          path: |
+            build/oracle-sphere-preview.png
+            build/ORACLE-SPHERE-v0.4.apk

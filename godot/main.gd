@@ -1,7 +1,7 @@
 extends Node3D
 
 var shell: Node3D
-var fluid: MeshInstance3D
+var fluid: Node3D
 var die: MeshInstance3D
 var angular_velocity=Vector2.ZERO
 var fluid_velocity=Vector2.ZERO
@@ -17,7 +17,7 @@ func _ready():
     var world=WorldEnvironment.new();var env=Environment.new();env.background_mode=Environment.BG_COLOR;env.background_color=Color("03080d");env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;env.ambient_light_color=Color("48727a");env.ambient_light_energy=0.42;env.glow_enabled=true;world.environment=env;add_child(world)
     # Blender's Z-up is converted to Godot's Y-up on glTF import. Face the
     # sculpture along Godot's Z axis instead of looking down its vertical axis.
-    var cam=Camera3D.new();cam.position=Vector3(0,1.15,13.5);cam.look_at_from_position(cam.position,Vector3(0,.35,0));cam.fov=36;add_child(cam)
+    var cam=Camera3D.new();cam.position=Vector3(0,1.15,20.0);cam.look_at_from_position(cam.position,Vector3(0,.35,0));cam.fov=36;add_child(cam)
     var key=DirectionalLight3D.new();key.rotation_degrees=Vector3(-32,-24,18);key.light_color=Color("ffe1a0");key.light_energy=2.2;add_child(key)
     var rim=OmniLight3D.new();rim.position=Vector3(-4,4,5);rim.omni_range=12;rim.light_color=Color("31d7d1");rim.light_energy=7.;add_child(rim)
     var packed=load("res://assets/oracle_models.glb") as PackedScene
@@ -25,7 +25,7 @@ func _ready():
     shell=Node3D.new();shell.name="FingerRolledKugel";shell.position=Vector3(0,1.15,0);add_child(shell)
     var glass=models.find_child("GlassSphere",true,false) as MeshInstance3D;glass.reparent(shell,false);glass.position=Vector3.ZERO;glass.material_override=ShaderMaterial.new();glass.material_override.shader=load("res://glass.gdshader")
     die=models.find_child("OracleDodecahedron",true,false) as MeshInstance3D;die.reparent(shell,false);die.position=Vector3.ZERO
-    fluid=MeshInstance3D.new();var mesh=SphereMesh.new();mesh.radius=3.25;mesh.height=6.5;mesh.radial_segments=64;mesh.rings=40;fluid.mesh=mesh;var fm=ShaderMaterial.new();fm.shader=load("res://fluid.gdshader");fluid.material_override=fm;fluid.position=Vector3.ZERO;shell.add_child(fluid);shell.move_child(fluid,0)
+    fluid=models.find_child("NebulaRig",true,false) as Node3D;fluid.reparent(shell,false);fluid.position=Vector3.ZERO;shell.move_child(fluid,0)
     build_ui()
 
 func build_ui():
@@ -49,8 +49,6 @@ func _process(delta):
     die_velocity=die_velocity.lerp(fluid_velocity,1.-exp(-delta/(tau*.48)))
     fluid.rotate_x(fluid_velocity.x*delta);fluid.rotate_z(fluid_velocity.y*delta)
     die.rotate_x(die_velocity.x*delta);die.rotate_z(die_velocity.y*delta);die.rotate_y((die_velocity.length()+fluid_velocity.length())*.21*delta)
-    fluid.material_override.set_shader_parameter("motion",fluid_velocity.length())
-    fluid.material_override.set_shader_parameter("flow",fluid_velocity)
     if not dragging and angular_velocity.length()+fluid_velocity.length()+die_velocity.length()<.018:
         settle_time+=delta
         if settle_time>0.42 and answer_label.text=="THE VEIL IS MOVING":commit_face()
