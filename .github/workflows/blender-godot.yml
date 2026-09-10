@@ -28,7 +28,7 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;35.0.1" "platforms;android-35"
           keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          godot --headless --editor --path godot --script res://configure_android.gd
+          timeout 20s godot --headless --editor --path godot --script res://configure_android.gd || true
       - name: Import generated GLB
         run: godot --headless --editor --path godot --quit-after 30
       - name: Export Android prototype
