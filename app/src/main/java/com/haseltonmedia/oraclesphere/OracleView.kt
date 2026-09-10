@@ -18,7 +18,9 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
         floatArrayOf(1f,phi,0f),floatArrayOf(-1f,phi,0f),floatArrayOf(1f,-phi,0f),floatArrayOf(-1f,-phi,0f),
         floatArrayOf(phi,0f,1f),floatArrayOf(phi,0f,-1f),floatArrayOf(-phi,0f,1f),floatArrayOf(-phi,0f,-1f)
     ).map { v-> val l=sqrt(v.sumOf{(it*it).toDouble()}).toFloat(); floatArrayOf(v[0]/l,v[1]/l,v[2]/l) }
-    private val particles=List(110){ P(Math.random().toFloat(),Math.random().toFloat(),Math.random().toFloat(),Math.random().toFloat()) }
+    private val particles=List(220){ P(Math.random().toFloat(),Math.random().toFloat(),Math.random().toFloat(),Math.random().toFloat()) }
+    private val vertices: List<FloatArray>
+    private val faces: List<IntArray>
     private data class P(var a:Float,var r:Float,var z:Float,var phase:Float)
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
     private val thin=Paint(Paint.ANTI_ALIAS_FLAG).apply{style=Paint.Style.STROKE;strokeWidth=2f}
@@ -32,13 +34,33 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
     private val vibrator = if(Build.VERSION.SDK_INT>=31) (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator else @Suppress("DEPRECATION") context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
     private var hapticClock=0f
 
-    init { isFocusable=true; Choreographer.getInstance().postFrameCallback(this) }
+    init {
+        isFocusable=true
+        val q=1f/phi
+        vertices=buildList {
+            for(x in listOf(-1f,1f))for(y in listOf(-1f,1f))for(z in listOf(-1f,1f))add(floatArrayOf(x,y,z))
+            for(a in listOf(-q,q))for(b in listOf(-phi,phi)){add(floatArrayOf(0f,a,b));add(floatArrayOf(a,b,0f));add(floatArrayOf(b,0f,a))}
+        }
+        faces=normals.map { n ->
+            val chosen=vertices.indices.sortedByDescending { dot(vertices[it],n) }.take(5)
+            val center=floatArrayOf(chosen.map{vertices[it][0]}.average().toFloat(),chosen.map{vertices[it][1]}.average().toFloat(),chosen.map{vertices[it][2]}.average().toFloat())
+            val ref=if(abs(n[2])<.8f)floatArrayOf(0f,0f,1f)else floatArrayOf(0f,1f,0f)
+            val ux=normalize(cross(ref,n));val uy=cross(n,ux)
+            chosen.sortedBy { atan2(dot(sub(vertices[it],center),uy),dot(sub(vertices[it],center),ux)) }.toIntArray()
+        }
+        Choreographer.getInstance().postFrameCallback(this)
+    }
+    private fun dot(a:FloatArray,b:FloatArray)=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]
+    private fun sub(a:FloatArray,b:FloatArray)=floatArrayOf(a[0]-b[0],a[1]-b[1],a[2]-b[2])
+    private fun cross(a:FloatArray,b:FloatArray)=floatArrayOf(a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0])
+    private fun normalize(a:FloatArray):FloatArray{val l=sqrt(dot(a,a));return floatArrayOf(a[0]/l,a[1]/l,a[2]/l)}
     fun resetTuning(){mu=1.15f;rho=1f;dieMass=1f;hapticGain=1f}
     fun imuImpulse(x:Float,y:Float,z:Float,strength:Float){ excite(-y*.055f,x*.055f,z*.025f,(strength/12f).coerceIn(.18f,1.25f)) }
     fun kick(strength:Float){ excite((Math.random()-.5).toFloat()*strength,(Math.random()-.5).toFloat()*strength,(Math.random()-.5).toFloat()*strength,strength) }
     private fun excite(ix:Float,iy:Float,iz:Float,s:Float){
-        shellX+=ix*13f; shellY+=iy*13f; shellZ+=iz*9f; slosh=(slosh+s*1.2f).coerceAtMost(2.8f); inputAge=0f; committed=-1; stillTime=0f
-        pulse((45+25*s).toLong(),(55+70*s*hapticGain).toInt().coerceIn(1,220))
+        val wasQuiet=inputAge>.28f
+        shellX+=ix*18f; shellY+=iy*18f; shellZ+=iz*13f; slosh=(slosh+s*1.25f).coerceAtMost(2.8f); inputAge=0f; committed=-1; stillTime=0f
+        if(wasQuiet && s>.20f) pulse((40+18*s).toLong(),(35+42*s*hapticGain).toInt().coerceIn(1,135))
     }
     private fun pulse(ms:Long,amp:Int){ if(hapticGain<=0f)return; if(Build.VERSION.SDK_INT>=26)vibrator.vibrate(VibrationEffect.createOneShot(ms,amp)) else @Suppress("DEPRECATION") vibrator.vibrate(ms) }
 
@@ -60,9 +82,9 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
         val energy=sqrt(wx*wx+wy*wy+wz*wz)+sqrt(fluidX*fluidX+fluidY*fluidY+fluidZ*fluidZ)+slosh*.32f
         if(energy<.105f && inputAge>.45f){ stillTime+=dt; creepToFace(dt); if(stillTime>.38f && committed<0)commitFace() } else stillTime=0f
         hapticClock+=dt
-        if(inputAge>.08f && energy>.14f && hapticClock>.095f){
+        if(inputAge>.16f && energy>.30f && hapticClock>.16f){
             val diss=(mu*(abs(fluidX-wx)+abs(fluidY-wy)+abs(fluidZ-wz))*.10f + slosh*.035f)*hapticGain
-            if(diss>.035f){pulse(35,(18+diss*92).toInt().coerceIn(10,90));hapticClock=0f}
+            if(diss>.075f){pulse(28,(10+diss*58).toInt().coerceIn(8,58));hapticClock=0f}
         }
     }
     private fun creepToFace(dt:Float){
@@ -106,8 +128,17 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
     }
     private fun drawTitle(c:Canvas,w:Float){paint.textAlign=Paint.Align.CENTER;paint.color=0xFFE5C77B.toInt();paint.typeface=Typeface.create("serif",Typeface.NORMAL);paint.textSize=22f*resources.displayMetrics.scaledDensity;paint.letterSpacing=.22f;c.drawText("ORACLE SPHERE",w/2,48f*resources.displayMetrics.density,paint);paint.letterSpacing=0f;paint.typeface=null}
     private fun drawNebula(c:Canvas,cx:Float,cy:Float,r:Float){
-        val lag=atan2(fluidY,fluidX)+sloshPhase*.16f
-        repeat(7){i-> val rr=r*(.23f+i*.09f); val a=lag+i*.91f+sin(sloshPhase+i)*slosh*.12f; thin.strokeWidth=r*(.045f-i*.003f);thin.color=if(i%2==0)0x4038D7CF else 0x40E5B85F;thin.maskFilter=BlurMaskFilter(r*.035f,BlurMaskFilter.Blur.NORMAL);val oval=RectF(cx-rr,cy-rr*.55f,cx+rr,cy+rr*.55f);c.save();c.rotate(a*57.3f,cx,cy);c.drawArc(oval,20f,215f,false,thin);c.restore()}
+        val lag=atan2(fluidY,fluidX)+sloshPhase*.20f
+        // Three participating-media glows give the fluid luminous volume.
+        repeat(3){i->
+            val a=lag+i*2.09f;val gx=cx+cos(a)*r*(.18f+i*.06f);val gy=cy+sin(a)*r*(.13f+i*.035f)
+            paint.shader=RadialGradient(gx,gy,r*(.38f+i*.05f),if(i==1)0x55F0B65D else 0x5532D5D0,0x00101820,Shader.TileMode.CLAMP);c.drawCircle(gx,gy,r*.52f,paint);paint.shader=null
+        }
+        // Advected filament ribbons: geometry, brightness and phase share fluid state.
+        repeat(13){i->
+            val path=Path();val base=lag+i*.71f;for(j in 0..42){val t=j/42f;val a=base+t*(2.1f+sin(i*.7f)*.8f)+sin(sloshPhase*.7f+t*5f+i)*(.08f+slosh*.035f);val rr=r*(.13f+t*.61f+sin(t*9f+i)*.035f);val x=cx+cos(a)*rr;val y=cy+sin(a)*rr*.70f;if(j==0)path.moveTo(x,y)else path.lineTo(x,y)}
+            thin.strokeWidth=r*(if(i%3==0).025f else .012f);thin.color=if(i%3==0)0x9943E0D5.toInt() else if(i%3==1)0x88E7B75E.toInt() else 0x663A8F9E;thin.maskFilter=BlurMaskFilter(r*(if(i%3==0).020f else .012f),BlurMaskFilter.Blur.NORMAL);c.drawPath(path,thin)
+        }
         thin.maskFilter=null
     }
     private fun drawParticles(c:Canvas,cx:Float,cy:Float,r:Float){
@@ -115,12 +146,22 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
         particles.forEachIndexed{i,p->p.a+=speed*(if(i%3==0)-1 else 1);val rr=r*(.15f+p.r*.77f);val x=cx+cos(p.a*6.283f+sloshPhase*.08f)*rr;val y=cy+sin(p.a*6.283f+sloshPhase*.11f)*rr*.72f;val edge=(1f-(hypot(x-cx,y-cy)/r)).coerceIn(0f,1f);paint.color=if(i%4==0)0xFFE5BB66.toInt() else 0xFF43BFC0.toInt();paint.alpha=(35+edge*155).toInt();c.drawCircle(x,y,1f+p.phase*2.2f,paint)};paint.alpha=255
     }
     private fun drawDie(c:Canvas,cx:Float,cy:Float,r:Float){
-        val face=if(committed>=0)committed else facingFace();val n=rotate(normals[face]);val scale=r*(.34f+n[2]*.055f);val dcx=cx+n[0]*r*.07f+sin(sloshPhase)*slosh*r*.012f;val dcy=cy-n[1]*r*.07f+cos(sloshPhase*.8f)*slosh*r*.010f
-        val path=Path();for(i in 0..4){val a=-PI/2+2*PI*i/5+az*.18;val x=dcx+cos(a).toFloat()*scale;val y=dcy+sin(a).toFloat()*scale*.82f;if(i==0)path.moveTo(x,y)else path.lineTo(x,y)};path.close()
-        paint.shader=RadialGradient(dcx,dcy-scale*.2f,scale*1.2f,intArrayOf(0xDD103D40.toInt(),0xEE07181C.toInt(),0xFF020709.toInt()),null,Shader.TileMode.CLAMP);c.drawPath(path,paint);paint.shader=null
-        thin.color=0xFFE6C878.toInt();thin.strokeWidth=if(settleGlow>0f)5f else 2.5f;thin.maskFilter=BlurMaskFilter((2f+settleGlow*12f),BlurMaskFilter.Blur.NORMAL);c.drawPath(path,thin);thin.maskFilter=null
-        val inner=Path();for(i in 0..4){val a=-PI/2+2*PI*i/5+az*.18;val x=dcx+cos(a).toFloat()*scale*.84f;val y=dcy+sin(a).toFloat()*scale*.69f;if(i==0)inner.moveTo(x,y)else inner.lineTo(x,y)};inner.close();thin.strokeWidth=1.2f;thin.color=0x99D8B667.toInt();c.drawPath(inner,thin)
-        paint.textAlign=Paint.Align.CENTER;paint.typeface=Typeface.create("serif",Typeface.BOLD);paint.color=0xFFFFE5A1.toInt();paint.setShadowLayer(12f,0f,0f,0xFFE2A94D.toInt());val txt=answers[face];val lines=wrap(txt,18);paint.textSize=(if(lines.size>1)r*.070f else r*.088f);val lineH=paint.textSize*1.08f;lines.forEachIndexed{i,s->c.drawText(s,dcx,dcy-(lines.size-1)*lineH/2+i*lineH-paint.ascent()/2-paint.descent()/2,paint)};paint.clearShadowLayer();paint.typeface=null
+        val face=if(committed>=0)committed else facingFace();val driftX=sin(sloshPhase)*slosh*r*.012f;val driftY=cos(sloshPhase*.8f)*slosh*r*.010f
+        val scale=r*.235f
+        val projected=vertices.map{v->val p=rotate(v);floatArrayOf(cx+p[0]*scale+driftX,cy-p[1]*scale+driftY,p[2])}
+        // Painter-sort all physical faces. Side faces remain visible as the body rotates.
+        val order=faces.indices.sortedBy{fi->faces[fi].map{projected[it][2]}.average()}
+        order.forEach{fi->
+            val fn=rotate(normals[fi]);if(fn[2]<-.28f)return@forEach
+            val path=Path();faces[fi].forEachIndexed{i,vi->val p=projected[vi];if(i==0)path.moveTo(p[0],p[1])else path.lineTo(p[0],p[1])};path.close()
+            val light=((fn[2]+1f)*.5f).coerceIn(0f,1f);paint.color=Color.rgb((4+light*10).toInt(),(18+light*35).toInt(),(21+light*38).toInt());paint.alpha=220;c.drawPath(path,paint);paint.alpha=255
+            thin.color=if(fi==face)0xFFF3D077.toInt() else 0xAA9E7A35.toInt();thin.strokeWidth=if(fi==face)3.8f else 1.5f;thin.maskFilter=if(fi==face)BlurMaskFilter(3f+settleGlow*9f,BlurMaskFilter.Blur.NORMAL)else null;c.drawPath(path,thin);thin.maskFilter=null
+            if(fi==face){
+                // Filigree inset follows the actual settling face.
+                val centerX=faces[fi].map{projected[it][0]}.average().toFloat();val centerY=faces[fi].map{projected[it][1]}.average().toFloat();val inner=Path();faces[fi].forEachIndexed{i,vi->val p=projected[vi];val x=centerX+(p[0]-centerX)*.82f;val y=centerY+(p[1]-centerY)*.82f;if(i==0)inner.moveTo(x,y)else inner.lineTo(x,y)};inner.close();thin.strokeWidth=1f;thin.color=0xBBD8B667.toInt();c.drawPath(inner,thin)
+                paint.textAlign=Paint.Align.CENTER;paint.typeface=Typeface.create("serif",Typeface.BOLD);paint.color=0xFFFFE5A1.toInt();paint.setShadowLayer(12f,0f,0f,0xFFE2A94D.toInt());val lines=wrap(answers[face],18);paint.textSize=if(lines.size>1)r*.040f else r*.052f;val lh=paint.textSize*1.05f;lines.forEachIndexed{i,s->c.drawText(s,centerX,centerY-(lines.size-1)*lh/2+i*lh-paint.ascent()/2-paint.descent()/2,paint)};paint.clearShadowLayer();paint.typeface=null
+            }
+        }
     }
     private fun wrap(s:String,max:Int):List<String>{val words=s.split(" ");val out=mutableListOf<String>();var line="";for(w in words){if(line.isNotEmpty()&&line.length+1+w.length>max){out+=line;line=w}else line=if(line.isEmpty())w else "$line $w"};if(line.isNotEmpty())out+=line;return out}
     override fun onTouchEvent(e:MotionEvent):Boolean{

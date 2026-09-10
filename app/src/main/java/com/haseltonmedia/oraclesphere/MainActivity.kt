@@ -14,6 +14,7 @@ class MainActivity : Activity(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var last = FloatArray(3)
     private var primed = false
+    private var lastImpulseNs = 0L
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -72,7 +73,13 @@ class MainActivity : Activity(), SensorEventListener {
         if(!primed){ last=e.values.clone(); primed=true; return }
         val dx=e.values[0]-last[0]; val dy=e.values[1]-last[1]; val dz=e.values[2]-last[2]
         val impulse=kotlin.math.sqrt(dx*dx+dy*dy+dz*dz)
-        if(impulse>2.25f) oracle.imuImpulse(dx,dy,dz,impulse)
-        for(i in 0..2) last[i]=e.values[i]
+        val now=System.nanoTime()
+        // Ignore hand tremor, walking vibration and sensor noise. A deliberate shake
+        // must cross the gate and onset haptics are rate-limited.
+        if(impulse>5.2f && now-lastImpulseNs>180_000_000L) {
+            oracle.imuImpulse(dx,dy,dz,impulse)
+            lastImpulseNs=now
+        }
+        for(i in 0..2) last[i]=last[i]*.35f+e.values[i]*.65f
     }
 }
