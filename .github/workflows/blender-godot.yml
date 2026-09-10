@@ -25,11 +25,17 @@ jobs:
           mkdir -p ~/.config/godot ~/.android
           cp godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.tres
           sed -i "s|__JAVA_HOME__|$JAVA_HOME|" ~/.config/godot/editor_settings-4.tres
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "build-tools;35.0.1" "platforms;android-35" "cmake;3.10.2.4988404" "ndk;28.1.13356709"
           keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
       - name: Import generated GLB
         run: godot --headless --editor --path godot --quit-after 30
       - name: Export Android prototype
         run: mkdir -p build && godot --headless --path godot --export-debug Android ../build/ORACLE-SPHERE-v0.4.apk
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: /home/runner/.android/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
       - uses: actions/upload-artifact@v4
         with:
           name: oracle-sphere-v0.4-blender-godot
