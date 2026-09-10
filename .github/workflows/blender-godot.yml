@@ -20,6 +20,12 @@ jobs:
           version: 4.4.1
           use-dotnet: false
           include-templates: true
+      - name: Configure Android exporter
+        run: |
+          mkdir -p ~/.config/godot ~/.android
+          cp godot/editor_settings-4.tres ~/.config/godot/editor_settings-4.tres
+          sed -i "s|__JAVA_HOME__|$JAVA_HOME|" ~/.config/godot/editor_settings-4.tres
+          keytool -genkeypair -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
       - name: Import generated GLB
         run: godot --headless --editor --path godot --quit-after 30
       - name: Export Android prototype
