@@ -39,7 +39,7 @@ bev=die.modifiers.new('Gold filigree edges','BEVEL');bev.width=.035;bev.segments
 
 # Sparse luminous filaments create suspended depth without an opaque fluid shell.
 rig=bpy.data.objects.new('NebulaRig',None);bpy.context.collection.objects.link(rig);rig.location.z=1.05
-for band in range(7):
+for band in range(4):
     curve=bpy.data.curves.new('Suspended filament','CURVE');curve.dimensions='3D';curve.resolution_u=2;curve.bevel_depth=.012 if band%3 else .020;curve.bevel_resolution=2
     spline=curve.splines.new('NURBS');steps=68;spline.points.add(steps-1);phase=band*1.71
     for i in range(steps):
@@ -47,6 +47,18 @@ for band in range(7):
         spline.points[i].co=(radius*math.cos(t),.52*math.sin(t*1.45+phase)+(.08*band-.24),.82*radius*math.sin(t)+.12*math.sin(t*2.2+phase),1)
     spline.use_endpoint_u=True;spline.order_u=4
     obj=bpy.data.objects.new('NebulaFilament_%02d'%band,curve);bpy.context.collection.objects.link(obj);obj.parent=rig;obj.data.materials.append(teal_glow if band%3 else gold_glow)
+
+# Photographic suspended-galaxy layer. The transparent texture supplies soft
+# dye density while the geometry above supplies parallax and physical motion.
+nebula_img=bpy.data.images.load(os.path.join(OUT,'nebula_fluid.png'))
+nebula_mat=bpy.data.materials.new('Viscous Nebula Dye');nebula_mat.use_nodes=True;nebula_mat.blend_method='BLEND';nebula_mat.use_screen_refraction=True
+nt=nebula_mat.node_tree;bs=nt.nodes.get('Principled BSDF');tex=nt.nodes.new('ShaderNodeTexImage');tex.image=nebula_img
+nt.links.new(tex.outputs['Color'],bs.inputs['Base Color']);nt.links.new(tex.outputs['Alpha'],bs.inputs['Alpha'])
+em=bs.inputs.get('Emission Color') or bs.inputs.get('Emission')
+if em:nt.links.new(tex.outputs['Color'],em)
+if bs.inputs.get('Emission Strength'):bs.inputs['Emission Strength'].default_value=.65
+bs.inputs['Roughness'].default_value=.3
+bpy.ops.mesh.primitive_plane_add(size=2,location=(0,.62,1.05),rotation=(math.pi/2,0,0));dye=bpy.context.object;dye.name='NebulaDyeLayer';dye.scale=(2.72,2.72,2.72);dye.data.materials.append(nebula_mat);dye.parent=rig
 
 random.seed(23);dust_parts=[]
 for _ in range(150):
