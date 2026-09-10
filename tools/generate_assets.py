@@ -24,8 +24,8 @@ def emission(name,color,strength):
 gold=principled('Etched Gold',(.60,.30,.055),.94,.16,(.9,.42,.08),.55)
 stone=principled('Matte Charcoal Stone',(.012,.016,.022),.04,.78)
 die_dark=principled('Obsidian Faces',(.006,.025,.034),.42,.17)
-teal_glow=emission('Nebula Teal',(.005,.72,.74),7.0);gold_glow=emission('Nebula Gold',(1.0,.34,.045),5.0)
-glass_rim=emission('Glass Rim',(.01,.34,.38),1.35)
+teal_glow=emission('Nebula Teal',(.004,.48,.52),2.0);gold_glow=emission('Nebula Gold',(.82,.25,.035),1.45)
+glass_rim=emission('Glass Rim',(.005,.18,.21),.32)
 
 # Exact regular dodecahedron: 20 vertices, 30 edges, 12 pentagons.
 p=(1+5**.5)/2;q=1/p
@@ -34,22 +34,22 @@ for a in (-q,q):
     for b in (-p,p):verts += [(0,a,b),(a,b,0),(b,0,a)]
 faces=[(4,8,14,6,13),(8,0,10,2,14),(10,0,9,1,16),(2,10,16,3,12),(9,15,5,11,1),(0,8,4,15,9),(4,13,19,5,15),(1,11,17,3,16),(11,5,19,7,17),(6,14,2,12,18),(13,6,18,7,19),(18,12,3,17,7)]
 mesh=bpy.data.meshes.new('RegularDodecahedronMesh');mesh.from_pydata(verts,[],faces);mesh.update()
-die=bpy.data.objects.new('OracleDodecahedron',mesh);bpy.context.collection.objects.link(die);die.scale=(.72,)*3;die.location.z=1.05;die.data.materials.append(die_dark);die.data.materials.append(gold)
+die=bpy.data.objects.new('OracleDodecahedron',mesh);bpy.context.collection.objects.link(die);die.scale=(.98,)*3;die.location.z=1.05;die.data.materials.append(die_dark);die.data.materials.append(gold)
 bev=die.modifiers.new('Gold filigree edges','BEVEL');bev.width=.035;bev.segments=3;bev.material=1
 
 # Sparse luminous filaments create suspended depth without an opaque fluid shell.
 rig=bpy.data.objects.new('NebulaRig',None);bpy.context.collection.objects.link(rig);rig.location.z=1.05
-for band in range(11):
-    curve=bpy.data.curves.new('Suspended filament','CURVE');curve.dimensions='3D';curve.resolution_u=2;curve.bevel_depth=.018 if band%3 else .028;curve.bevel_resolution=2
-    spline=curve.splines.new('NURBS');steps=84;spline.points.add(steps-1);phase=band*1.37
+for band in range(7):
+    curve=bpy.data.curves.new('Suspended filament','CURVE');curve.dimensions='3D';curve.resolution_u=2;curve.bevel_depth=.012 if band%3 else .020;curve.bevel_resolution=2
+    spline=curve.splines.new('NURBS');steps=68;spline.points.add(steps-1);phase=band*1.71
     for i in range(steps):
-        t=(i/(steps-1))*math.tau*1.45+phase;radius=1.52+.48*math.sin(t*.47+phase)+.10*math.sin(t*3.)
-        spline.points[i].co=(radius*math.cos(t),.35*math.sin(t*1.8+phase)+(.10*band-.5),.74*radius*math.sin(t)+.16*math.sin(t*2.7+phase),1)
+        t=(i/(steps-1))*math.tau*.92+phase;radius=2.18+.23*math.sin(t*.72+phase)+.08*math.sin(t*2.4)
+        spline.points[i].co=(radius*math.cos(t),.52*math.sin(t*1.45+phase)+(.08*band-.24),.82*radius*math.sin(t)+.12*math.sin(t*2.2+phase),1)
     spline.use_endpoint_u=True;spline.order_u=4
     obj=bpy.data.objects.new('NebulaFilament_%02d'%band,curve);bpy.context.collection.objects.link(obj);obj.parent=rig;obj.data.materials.append(teal_glow if band%3 else gold_glow)
 
 random.seed(23);dust_parts=[]
-for _ in range(90):
+for _ in range(150):
     ang=random.random()*math.tau;r=random.uniform(.8,2.55)
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=1,radius=random.uniform(.012,.035),location=(r*math.cos(ang),random.uniform(-.75,.75),.72*r*math.sin(ang)));dust_parts.append(bpy.context.object)
 bpy.ops.object.select_all(action='DESELECT')
@@ -69,7 +69,7 @@ bpy.ops.mesh.primitive_torus_add(major_radius=2.82,minor_radius=.045,major_segme
 
 # Deterministic portrait product checkpoint.
 preview_only=[]
-bpy.ops.curve.primitive_bezier_circle_add(radius=3.45,location=(0,-.08,1.05),rotation=(math.pi/2,0,0));preview_rim=bpy.context.object;preview_rim.data.bevel_depth=.025;preview_rim.data.bevel_resolution=3;preview_rim.data.materials.append(glass_rim);preview_only.append(preview_rim)
+bpy.ops.curve.primitive_bezier_circle_add(radius=3.45,location=(0,-.08,1.05),rotation=(math.pi/2,0,0));preview_rim=bpy.context.object;preview_rim.data.bevel_depth=.012;preview_rim.data.bevel_resolution=3;preview_rim.data.materials.append(glass_rim);preview_only.append(preview_rim)
 bpy.ops.mesh.primitive_plane_add(size=40,location=(0,0,-2.84));floor=bpy.context.object;floor.data.materials.append(stone);preview_only.append(floor)
 bpy.ops.object.camera_add(location=(0,-20.5,1.45));cam=bpy.context.object;preview_only.append(cam);cam.rotation_euler=(Vector((0,0,.45))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.lens=53;bpy.context.scene.camera=cam
 for loc,color,energy,size in [((-4,-5,7),(1.,.68,.30),1150,4.),((4,-1,4),(.02,.72,.78),850,3.),((0,3,7),(.35,.55,1.),650,3.)]:
