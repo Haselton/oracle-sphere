@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.hardware.*
 import android.view.*
 import android.widget.*
+import com.google.android.gms.ads.*
 
 class MainActivity : Activity(), SensorEventListener {
     private lateinit var oracle: OracleView
@@ -24,6 +25,7 @@ class MainActivity : Activity(), SensorEventListener {
             ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         oracle = OracleView(this)
         setContentView(buildUi())
+        MobileAds.initialize(this) {}
     }
 
     private fun buildUi(): View {
@@ -40,6 +42,12 @@ class MainActivity : Activity(), SensorEventListener {
         controls.addView(button("HISTORY") { showHistory() }, LinearLayout.LayoutParams(0,-2,1f))
         controls.addView(button("TUNE") { showTuning() }, LinearLayout.LayoutParams(0,-2,1f))
         root.addView(controls)
+        val ad = AdView(this).apply {
+            adUnitId = "ca-app-pub-3940256099942544/9214589741"
+            setAdSize(AdSize.BANNER)
+            loadAd(AdRequest.Builder().build())
+        }
+        root.addView(FrameLayout(this).apply { setBackgroundColor(Color.rgb(3,6,9)); addView(ad, FrameLayout.LayoutParams(-2,-2,Gravity.CENTER)) }, LinearLayout.LayoutParams(-1,(50*resources.displayMetrics.density).toInt()))
         return root
     }
 

@@ -1,7 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
-    <application android:theme="@style/AppTheme" android:label="ORACLE SPHERE" android:allowBackup="true" android:supportsRtl="true">
+    <application android:theme="@style/AppTheme" android:label="ORACLE SPHERE" android:allowBackup="true" android:supportsRtl="true" android:hardwareAccelerated="true">
+        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713" />
         <activity android:name=".MainActivity" android:screenOrientation="portrait" android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

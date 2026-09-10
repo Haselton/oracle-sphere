@@ -25,6 +25,7 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG)
     private val thin=Paint(Paint.ANTI_ALIAS_FLAG).apply{style=Paint.Style.STROKE;strokeWidth=2f}
     private var ax=.18f; private var ay=-.36f; private var az=.08f
+    private var shellRollX=0f; private var shellRollY=0f; private var galaxyAngle=0f
     private var wx=0f; private var wy=0f; private var wz=0f
     private var fluidX=0f; private var fluidY=0f; private var fluidZ=0f
     private var shellX=0f; private var shellY=0f; private var shellZ=0f
@@ -33,6 +34,8 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
     private var committed=-1; private var stillTime=0f; private var inputAge=99f; private var settleGlow=0f
     private val vibrator = if(Build.VERSION.SDK_INT>=31) (context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator else @Suppress("DEPRECATION") context.getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
     private var hapticClock=0f
+    private var dragging=false; private var dragDistance=0f
+    private var sphereCx=0f; private var sphereCy=0f; private var sphereRadius=1f
 
     init {
         isFocusable=true
@@ -78,7 +81,11 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
         wx=(wx+(fluidX-wx)*dt*2.1f/dieMass)*drag; wy=(wy+(fluidY-wy)*dt*2.1f/dieMass)*drag; wz=(wz+(fluidZ-wz)*dt*2.1f/dieMass)*drag
         ax+=wx*dt; ay+=wy*dt; az+=wz*dt
         fluidX*=exp(-dt/tau); fluidY*=exp(-dt/tau); fluidZ*=exp(-dt/tau)
-        sloshPhase+=dt*(5.2f+slosh); slosh*=exp(-dt/tau); impact*=exp(-dt*12f); settleGlow*=exp(-dt*1.7f)
+        val fluidSpeed=sqrt(fluidX*fluidX+fluidY*fluidY+fluidZ*fluidZ)
+        sloshPhase+=dt*(.15f+fluidSpeed*1.8f+slosh*1.3f)
+        galaxyAngle+=dt*(fluidZ*.42f+(fluidX-fluidY)*.08f)
+        shellRollX+=shellX*dt*.26f;shellRollY+=shellY*dt*.26f
+        slosh*=exp(-dt/tau); impact*=exp(-dt*12f); settleGlow*=exp(-dt*1.7f)
         val energy=sqrt(wx*wx+wy*wy+wz*wz)+sqrt(fluidX*fluidX+fluidY*fluidY+fluidZ*fluidZ)+slosh*.32f
         if(energy<.105f && inputAge>.45f){ stillTime+=dt; creepToFace(dt); if(stillTime>.38f && committed<0)commitFace() } else stillTime=0f
         hapticClock+=dt
@@ -108,38 +115,44 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
     private fun facingFace():Int { var best=0;var z=-9f; normals.forEachIndexed{i,n->val q=rotate(n)[2];if(q>z){z=q;best=i}};return best }
 
     override fun onDraw(c:Canvas){
-        super.onDraw(c); val w=width.toFloat();val h=height.toFloat();val cx=w/2;val cy=h*.47f;val radius=min(w*.43f,h*.33f)
+        super.onDraw(c); val w=width.toFloat();val h=height.toFloat();val cx=w/2;val cy=h*.47f;val radius=min(w*.43f,h*.33f);sphereCx=cx;sphereCy=cy;sphereRadius=radius
         paint.shader=LinearGradient(0f,0f,0f,h,Color.rgb(3,10,16),Color.rgb(1,3,7),Shader.TileMode.CLAMP);c.drawRect(0f,0f,w,h,paint);paint.shader=null
         // cinematic shafts
         paint.shader=LinearGradient(cx,0f,cx,cy,0x443CB7B0,0x00104042,Shader.TileMode.CLAMP); val beam=Path().apply{moveTo(cx-w*.17f,0f);lineTo(cx+radius*.45f,cy);lineTo(cx-radius*.45f,cy);close()};c.drawPath(beam,paint);paint.shader=null
         drawTitle(c,w)
-        // matte cradle behind and in front of sphere
-        paint.shader=RadialGradient(cx,cy+radius*.87f,radius*.9f,intArrayOf(0xFF34383A.toInt(),0xFF101416.toInt(),0xFF020405.toInt()),floatArrayOf(0f,.55f,1f),Shader.TileMode.CLAMP)
-        c.drawOval(cx-radius*.82f,cy+radius*.64f,cx+radius*.82f,cy+radius*1.27f,paint);paint.shader=null
+        // Ball-return cradle: rear trough and side rollers suspend the sphere.
+        paint.shader=LinearGradient(cx-radius,cy+radius*.45f,cx+radius,cy+radius*1.2f,0xFF3B4042.toInt(),0xFF050708.toInt(),Shader.TileMode.CLAMP)
+        c.drawRoundRect(cx-radius*.96f,cy+radius*.67f,cx+radius*.96f,cy+radius*1.25f,radius*.34f,radius*.34f,paint);paint.shader=null
+        thin.color=0xFF353B3D.toInt();thin.strokeWidth=radius*.12f;c.drawArc(cx-radius*1.05f,cy-radius*.16f,cx-radius*.43f,cy+radius*1.05f,70f,118f,false,thin);c.drawArc(cx+radius*.43f,cy-radius*.16f,cx+radius*1.05f,cy+radius*1.05f,-8f,118f,false,thin)
         c.save();c.clipPath(Path().apply{addCircle(cx,cy,radius,Path.Direction.CW)})
         paint.shader=RadialGradient(cx-radius*.28f,cy-radius*.32f,radius*1.45f,intArrayOf(0xFF12343C.toInt(),0xFF06141D.toInt(),0xFF010407.toInt()),floatArrayOf(0f,.48f,1f),Shader.TileMode.CLAMP);c.drawCircle(cx,cy,radius,paint);paint.shader=null
-        drawNebula(c,cx,cy,radius); drawParticles(c,cx,cy,radius); drawDie(c,cx,cy,radius)
+        drawNebula(c,cx,cy,radius); drawParticles(c,cx,cy,radius); drawDie(c,cx,cy,radius);drawShellRunes(c,cx,cy,radius)
         c.restore()
         // glass reflections and sapphire edge
         thin.strokeWidth=radius*.018f;thin.shader=SweepGradient(cx,cy,intArrayOf(0xFF133944.toInt(),0xAAE4C77D.toInt(),0x333DCFD0,0xFF081219.toInt(),0xFF133944.toInt()),null);c.drawCircle(cx,cy,radius*.985f,thin);thin.shader=null
         paint.shader=LinearGradient(cx-radius*.6f,cy-radius,cx,cy-radius*.1f,0xAAFFFFFF.toInt(),0x00FFFFFF,Shader.TileMode.CLAMP);c.drawArc(cx-radius*.75f,cy-radius*.86f,cx+radius*.35f,cy+radius*.15f,198f,77f,false,paint);paint.shader=null
-        paint.color=0x66000000;c.drawOval(cx-radius*.82f,cy+radius*.84f,cx+radius*.82f,cy+radius*1.23f,paint)
+        paint.shader=LinearGradient(cx,cy+radius*.72f,cx,cy+radius*1.21f,0xCC15191A.toInt(),0xFF020304.toInt(),Shader.TileMode.CLAMP);c.drawArc(cx-radius*.93f,cy+radius*.60f,cx+radius*.93f,cy+radius*1.24f,180f,180f,true,paint);paint.shader=null
         if(committed<0){paint.color=0xB8B7CBCB.toInt();paint.textSize=13f*resources.displayMetrics.scaledDensity;paint.textAlign=Paint.Align.CENTER;paint.letterSpacing=.15f;c.drawText(if(inputAge<2f)"THE VEIL IS MOVING" else "SHAKE · FLICK · TAP",cx,cy+radius*1.47f,paint);paint.letterSpacing=0f}
     }
     private fun drawTitle(c:Canvas,w:Float){paint.textAlign=Paint.Align.CENTER;paint.color=0xFFE5C77B.toInt();paint.typeface=Typeface.create("serif",Typeface.NORMAL);paint.textSize=22f*resources.displayMetrics.scaledDensity;paint.letterSpacing=.22f;c.drawText("ORACLE SPHERE",w/2,48f*resources.displayMetrics.density,paint);paint.letterSpacing=0f;paint.typeface=null}
     private fun drawNebula(c:Canvas,cx:Float,cy:Float,r:Float){
-        val lag=atan2(fluidY,fluidX)+sloshPhase*.20f
+        val lag=galaxyAngle+atan2(fluidY,fluidX)*.18f
         // Three participating-media glows give the fluid luminous volume.
         repeat(3){i->
             val a=lag+i*2.09f;val gx=cx+cos(a)*r*(.18f+i*.06f);val gy=cy+sin(a)*r*(.13f+i*.035f)
             paint.shader=RadialGradient(gx,gy,r*(.38f+i*.05f),if(i==1)0x55F0B65D else 0x5532D5D0,0x00101820,Shader.TileMode.CLAMP);c.drawCircle(gx,gy,r*.52f,paint);paint.shader=null
         }
         // Advected filament ribbons: geometry, brightness and phase share fluid state.
-        repeat(13){i->
-            val path=Path();val base=lag+i*.71f;for(j in 0..42){val t=j/42f;val a=base+t*(2.1f+sin(i*.7f)*.8f)+sin(sloshPhase*.7f+t*5f+i)*(.08f+slosh*.035f);val rr=r*(.13f+t*.61f+sin(t*9f+i)*.035f);val x=cx+cos(a)*rr;val y=cy+sin(a)*rr*.70f;if(j==0)path.moveTo(x,y)else path.lineTo(x,y)}
-            thin.strokeWidth=r*(if(i%3==0).025f else .012f);thin.color=if(i%3==0)0x9943E0D5.toInt() else if(i%3==1)0x88E7B75E.toInt() else 0x663A8F9E;thin.maskFilter=BlurMaskFilter(r*(if(i%3==0).020f else .012f),BlurMaskFilter.Blur.NORMAL);c.drawPath(path,thin)
+        repeat(24){i->
+            val path=Path();val arm=i%5;val base=lag+arm*(2f*PI.toFloat()/5f)+(i/5)*.055f;for(j in 0..56){val t=j/56f;val a=base+t*(3.7f+slosh*.18f)+sin(sloshPhase+t*7f+i)*(.025f+slosh*.025f);val rr=r*(.055f+t*.70f+sin(t*13f+i)*.018f);val x=cx+cos(a)*rr;val y=cy+sin(a)*rr*.61f;if(j==0)path.moveTo(x,y)else path.lineTo(x,y)}
+            thin.strokeWidth=r*(if(i<5).020f else .006f);thin.color=if(arm==0||arm==3)0xAA42DED6.toInt() else 0x88E5B75D.toInt();thin.alpha=if(i<5)175 else 78;thin.maskFilter=BlurMaskFilter(r*(if(i<5).018f else .008f),BlurMaskFilter.Blur.NORMAL);c.drawPath(path,thin)
         }
-        thin.maskFilter=null
+        thin.maskFilter=null;thin.alpha=255
+    }
+    private fun drawShellRunes(c:Canvas,cx:Float,cy:Float,r:Float){
+        c.save();c.rotate((shellRollY+shellRollX*.35f)*57.3f,cx,cy);thin.color=0x337DD2CA;thin.strokeWidth=1.2f
+        repeat(14){i->val a=i*2f*PI.toFloat()/14f;val rr=r*.84f;val x=cx+cos(a)*rr;val y=cy+sin(a)*rr;val s=r*.025f;c.drawLine(x-s,y,x+s,y,thin);c.drawLine(x,y-s,x,y+s,thin)}
+        c.drawArc(cx-r*.78f,cy-r*.30f,cx+r*.78f,cy+r*.30f,12f,128f,false,thin);c.drawArc(cx-r*.72f,cy-r*.48f,cx+r*.72f,cy+r*.48f,192f,108f,false,thin);c.restore()
     }
     private fun drawParticles(c:Canvas,cx:Float,cy:Float,r:Float){
         val speed=.002f+slosh*.006f
@@ -166,9 +179,9 @@ class OracleView(context: Context): View(context), Choreographer.FrameCallback {
     private fun wrap(s:String,max:Int):List<String>{val words=s.split(" ");val out=mutableListOf<String>();var line="";for(w in words){if(line.isNotEmpty()&&line.length+1+w.length>max){out+=line;line=w}else line=if(line.isEmpty())w else "$line $w"};if(line.isNotEmpty())out+=line;return out}
     override fun onTouchEvent(e:MotionEvent):Boolean{
         when(e.actionMasked){
-            MotionEvent.ACTION_DOWN->{lastTouchX=e.x;lastTouchY=e.y;downNs=System.nanoTime();return true}
-            MotionEvent.ACTION_MOVE->{val dx=e.x-lastTouchX;val dy=e.y-lastTouchY;if(hypot(dx,dy)>5f){excite(dy/width,-dx/width,(dx-dy)/width*.2f,(hypot(dx,dy)/width*1.7f).coerceAtMost(1f));lastTouchX=e.x;lastTouchY=e.y};return true}
-            MotionEvent.ACTION_UP->{if((System.nanoTime()-downNs)<220_000_000L)kick(.32f);return true}
+            MotionEvent.ACTION_DOWN->{lastTouchX=e.x;lastTouchY=e.y;downNs=System.nanoTime();dragDistance=0f;dragging=hypot(e.x-sphereCx,e.y-sphereCy)<sphereRadius;return dragging}
+            MotionEvent.ACTION_MOVE->{if(!dragging)return false;val dx=e.x-lastTouchX;val dy=e.y-lastTouchY;val d=hypot(dx,dy);if(d>2f){dragDistance+=d;shellRollX+=dy/sphereRadius;shellRollY-=dx/sphereRadius;shellX=dy/sphereRadius*28f;shellY=-dx/sphereRadius*28f;shellZ=(dx-dy)/sphereRadius*7f;slosh=(slosh+d/sphereRadius*.34f).coerceAtMost(2.8f);inputAge=0f;committed=-1;stillTime=0f;lastTouchX=e.x;lastTouchY=e.y};return true}
+            MotionEvent.ACTION_UP,MotionEvent.ACTION_CANCEL->{if(!dragging)return false;dragging=false;if(dragDistance<12f&&(System.nanoTime()-downNs)<220_000_000L)kick(.28f);return true}
         };return super.onTouchEvent(e)
     }
 }
