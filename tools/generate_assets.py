@@ -33,11 +33,11 @@ for a in (-q,q):
     for b in (-p,p):verts += [(0,a,b),(a,b,0),(b,0,a)]
 faces=[(4,8,14,6,13),(8,0,10,2,14),(10,0,9,1,16),(2,10,16,3,12),(9,15,5,11,1),(0,8,4,15,9),(4,13,19,5,15),(1,11,17,3,16),(11,5,19,7,17),(6,14,2,12,18),(13,6,18,7,19),(18,12,3,17,7)]
 mesh=bpy.data.meshes.new('RegularDodecahedronMesh');mesh.from_pydata(verts,[],faces);mesh.update()
-die=bpy.data.objects.new('OracleDodecahedron',mesh);bpy.context.collection.objects.link(die);die.scale=(.72,)*3;die.data.materials.append(die_dark);die.data.materials.append(gold)
+die=bpy.data.objects.new('OracleDodecahedron',mesh);bpy.context.collection.objects.link(die);die.scale=(.72,)*3;die.location.z=1.05;die.data.materials.append(die_dark);die.data.materials.append(gold)
 bev=die.modifiers.new('Gold filigree edges','BEVEL');bev.width=.035;bev.segments=3;bev.material=1
 
 # Sparse luminous filaments create suspended depth without an opaque fluid shell.
-rig=bpy.data.objects.new('NebulaRig',None);bpy.context.collection.objects.link(rig)
+rig=bpy.data.objects.new('NebulaRig',None);bpy.context.collection.objects.link(rig);rig.location.z=1.05
 for band in range(11):
     curve=bpy.data.curves.new('Suspended filament','CURVE');curve.dimensions='3D';curve.resolution_u=2;curve.bevel_depth=.018 if band%3 else .028;curve.bevel_resolution=2
     spline=curve.splines.new('NURBS');steps=84;spline.points.add(steps-1);phase=band*1.37
@@ -55,10 +55,10 @@ bpy.ops.object.select_all(action='DESELECT')
 for o in dust_parts:o.select_set(True)
 bpy.context.view_layer.objects.active=dust_parts[0];bpy.ops.object.join();dust=bpy.context.object;dust.name='NebulaGoldDust';dust.parent=rig;dust.data.materials.append(gold_glow)
 
-glass=principled('Obsidian Sapphire Glass',(.004,.018,.027),.08,.06);bs=glass.node_tree.nodes.get('Principled BSDF')
-trans=bs.inputs.get('Transmission Weight') or bs.inputs.get('Transmission')
-if trans:trans.default_value=.88
-if bs.inputs.get('IOR'):bs.inputs['IOR'].default_value=1.47
+glass=bpy.data.materials.new('Obsidian Sapphire Glass');glass.use_nodes=True;nt=glass.node_tree;nt.nodes.clear()
+out=nt.nodes.new('ShaderNodeOutputMaterial');mix=nt.nodes.new('ShaderNodeMixShader');clear=nt.nodes.new('ShaderNodeBsdfTransparent');rim=nt.nodes.new('ShaderNodeBsdfPrincipled');fresnel=nt.nodes.new('ShaderNodeFresnel')
+rim.inputs['Base Color'].default_value=(.002,.025,.038,1);rim.inputs['Metallic'].default_value=.18;rim.inputs['Roughness'].default_value=.08;fresnel.inputs['IOR'].default_value=1.38
+nt.links.new(clear.outputs[0],mix.inputs[1]);nt.links.new(rim.outputs[0],mix.inputs[2]);nt.links.new(fresnel.outputs[0],mix.inputs[0]);nt.links.new(mix.outputs[0],out.inputs[0])
 bpy.ops.mesh.primitive_uv_sphere_add(segments=96,ring_count=64,radius=3.45,location=(0,0,1.05));globe=bpy.context.object;globe.name='GlassSphere';globe.data.materials.append(glass);bpy.ops.object.shade_smooth()
 
 bpy.ops.mesh.primitive_cylinder_add(vertices=128,radius=3.62,depth=1.05,location=(0,0,-2.30));base=bpy.context.object;base.name='KugelStoneBase';base.data.materials.append(stone)
@@ -72,7 +72,8 @@ bpy.ops.mesh.primitive_plane_add(size=40,location=(0,0,-2.84));floor=bpy.context
 bpy.ops.object.camera_add(location=(0,-20.5,1.45));cam=bpy.context.object;preview_only.append(cam);cam.rotation_euler=(Vector((0,0,.45))-cam.location).to_track_quat('-Z','Y').to_euler();cam.data.lens=53;bpy.context.scene.camera=cam
 for loc,color,energy,size in [((-4,-5,7),(1.,.68,.30),1150,4.),((4,-1,4),(.02,.72,.78),850,3.),((0,3,7),(.35,.55,1.),650,3.)]:
     bpy.ops.object.light_add(type='AREA',location=loc);lamp=bpy.context.object;preview_only.append(lamp);lamp.data.energy=energy;lamp.data.color=color;lamp.data.shape='DISK';lamp.data.size=size;lamp.rotation_euler=(Vector((0,0,.4))-lamp.location).to_track_quat('-Z','Y').to_euler()
-scene=bpy.context.scene;scene.render.engine='BLENDER_EEVEE';scene.render.resolution_x=720;scene.render.resolution_y=1280;scene.render.resolution_percentage=50;scene.render.image_settings.file_format='PNG';scene.render.filepath=PREVIEW;scene.world.color=(.001,.003,.006);scene.view_settings.look='AgX - Medium High Contrast'
+scene=bpy.context.scene;scene.render.engine='BLENDER_EEVEE';scene.render.resolution_x=720;scene.render.resolution_y=1280;scene.render.resolution_percentage=50;scene.render.image_settings.file_format='PNG';scene.render.filepath=PREVIEW;scene.view_settings.look='AgX - Medium High Contrast'
+scene.world.use_nodes=True;bg=scene.world.node_tree.nodes.get('Background');bg.inputs['Color'].default_value=(.001,.003,.006,1);bg.inputs['Strength'].default_value=.025
 scene.use_nodes=True;nodes=scene.node_tree.nodes;links=scene.node_tree.links
 for n in list(nodes):nodes.remove(n)
 rl=nodes.new('CompositorNodeRLayers');glare=nodes.new('CompositorNodeGlare');glare.glare_type='FOG_GLOW';glare.quality='HIGH';glare.threshold=.8;glare.size=7;comp=nodes.new('CompositorNodeComposite');links.new(rl.outputs['Image'],glare.inputs['Image']);links.new(glare.outputs['Image'],comp.inputs['Image'])
