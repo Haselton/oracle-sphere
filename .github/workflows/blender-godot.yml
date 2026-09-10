@@ -36,6 +36,11 @@ jobs:
           timeout 20s godot --headless --editor --path godot --script res://configure_android.gd || true
       - name: Import generated GLB
         run: godot --headless --editor --path godot --quit-after 30
+      - name: Verify Android toolchain
+        run: |
+          test -f ~/.local/share/godot/export_templates/4.4.1.stable/android_debug.apk
+          test -x "$ANDROID_HOME/build-tools/34.0.0/apksigner"
+          grep -n "export/android" ~/.config/godot/editor_settings-4.4.tres
       - name: Export Android prototype
         run: mkdir -p build && godot --verbose --headless --path godot --export-debug Android ../build/ORACLE-SPHERE-v0.4.apk
         env:
