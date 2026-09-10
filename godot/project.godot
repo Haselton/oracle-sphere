@@ -1,0 +1,19 @@
+[application]
+config/name="ORACLE SPHERE"
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.4", "Mobile")
+
+[display]
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/window_width_override=360
+window/size/window_height_override=640
+window/stretch/mode="canvas_items"
+
+[rendering]
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+textures/default_filters/use_nearest_mipmap_filter=false
+
+[input_devices]
+pointing/emulate_touch_from_mouse=true
