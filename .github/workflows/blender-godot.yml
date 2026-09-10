@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
       - name: Install Blender
-        run: sudo apt-get update && sudo apt-get install -y blender python3-numpy
+        run: sudo apt-get update && sudo apt-get install -y blender python3-numpy libegl1 libgl1-mesa-dri
       - name: Generate exact 3D assets
         run: blender -b --python tools/generate_assets.py && test -s godot/assets/oracle_models.glb
       - uses: chickensoft-games/setup-godot@v2
