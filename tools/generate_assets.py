@@ -50,7 +50,7 @@ for band in range(4):
 
 # Photographic suspended-galaxy layer. The transparent texture supplies soft
 # dye density while the geometry above supplies parallax and physical motion.
-nebula_img=bpy.data.images.load(os.path.join(OUT,'nebula_fluid.png'))
+nebula_img=bpy.data.images.load(os.path.join(OUT,'nebula_fluid.webp'))
 nebula_mat=bpy.data.materials.new('Viscous Nebula Dye');nebula_mat.use_nodes=True;nebula_mat.blend_method='BLEND';nebula_mat.use_screen_refraction=True
 nt=nebula_mat.node_tree;bs=nt.nodes.get('Principled BSDF');tex=nt.nodes.new('ShaderNodeTexImage');tex.image=nebula_img
 nt.links.new(tex.outputs['Color'],bs.inputs['Base Color']);nt.links.new(tex.outputs['Alpha'],bs.inputs['Alpha'])
